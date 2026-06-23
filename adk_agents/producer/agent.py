@@ -29,9 +29,23 @@ class ProducerInput(BaseModel):
 
 from google.adk.events.event import Event
 
-def check_research(needs_more_research: bool = False, loop_count: int = 0):
+from typing import Any
+
+def check_research(critic_output: Any = None, loop_count: int = 0):
+    needs_more = False
+    critic_feedback = ""
+    
+    if critic_output:
+        if isinstance(critic_output, dict):
+            needs_more = critic_output.get("needs_more_research", False)
+            critic_feedback = critic_output.get("critic_feedback", "")
+        else:
+            if hasattr(critic_output, "needs_more_research"):
+                needs_more = critic_output.needs_more_research
+            if hasattr(critic_output, "critic_feedback"):
+                critic_feedback = critic_output.critic_feedback
+            
     new_loop_count = loop_count
-    needs_more = needs_more_research
     
     if needs_more:
         new_loop_count += 1
@@ -41,7 +55,11 @@ def check_research(needs_more_research: bool = False, loop_count: int = 0):
     route_name = "research" if needs_more else "final"
     return Event(
         route=route_name, 
-        state={"loop_count": new_loop_count}
+        state={
+            "loop_count": new_loop_count,
+            "needs_more_research": needs_more,
+            "critic_feedback": critic_feedback
+        }
     )
 
 root_agent = Workflow(

@@ -3,6 +3,7 @@ from pydantic import BaseModel, model_validator
 import re
 from google.adk.tools import FunctionTool
 from google.genai import Client, types
+from typing import Any
 
 class ProducerState(BaseModel):
     title: str = ""
@@ -18,6 +19,7 @@ class ProducerState(BaseModel):
     video_script: str = ""
     video_result: str = ""
     searcher: str = ""
+    critic_output: Any = None
 
 def perform_web_search(query: str) -> str:
     """
@@ -73,6 +75,8 @@ researcher_agent = Agent(
     model="gemini-2.5-flash",
 )
 
+from pydantic import BaseModel, Field
+
 class CriticOutput(BaseModel):
     critic_feedback: str
     needs_more_research: bool
@@ -83,6 +87,7 @@ class CriticOutput(BaseModel):
         if isinstance(data, dict):
             feedback = data.get("critic_feedback", "")
             if isinstance(feedback, str):
+                import re
                 match = re.search(r'"?needs_more_research"?\s*:\s*(true|false)', feedback, re.IGNORECASE)
                 if match:
                     val_str = match.group(1).lower()
@@ -94,8 +99,10 @@ critic_agent = Agent(
     name="critic",
     instruction="""あなたは鋭い視点を持つ批評家です。ステートに含まれる「draft」と「research」を読み込み、企画の弱点、リスク、さらに良くするための改善提案を指摘してください。
 必ず構造化されたJSONスキーマに沿って出力してください。テキスト文末に手動でJSON文字列を追記しないでください。
-内容が不十分であり、さらにリサーチが必要な場合はJSONパラメータの `needs_more_research` を true にし、リサーチャーに対する追加の調査ポイントをフィードバックテキストに含めてください。十分な場合は false にしてください。""",
+内容が不十分であり、さらにリサーチが必要な場合はJSONパラメータの `needs_more_research` を true にし、リサーチャーに対する追加の調査ポイントをフィードバックテキストに含めてください。十分な場合は false にしてください。
+必ず真偽値のboolean型で出力してください。文字列の"true"や"false"ではなく、JSONの真偽値（true / false）として指定すること。""",
     output_schema=CriticOutput,
+    output_key="critic_output",
     model="gemini-2.5-flash",
 )
 
