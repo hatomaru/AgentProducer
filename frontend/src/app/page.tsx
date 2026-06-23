@@ -127,6 +127,15 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {state.status === "approved" && state.video_result && (
+              <div className="bg-green-50 p-6 rounded-lg shadow border border-green-200 mt-6">
+                <h2 className="text-xl font-bold mb-4">動画生成結果</h2>
+                <pre className="whitespace-pre-wrap text-sm bg-white p-4 rounded h-32 overflow-y-auto">
+                  {state.video_result}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </main>

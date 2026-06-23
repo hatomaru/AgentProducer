@@ -1,5 +1,8 @@
 from google.adk import Agent
 from pydantic import BaseModel, model_validator
+import re
+from google.adk.tools import FunctionTool
+from google.genai import Client, types
 
 class ProducerState(BaseModel):
     title: str = ""
@@ -9,6 +12,35 @@ class ProducerState(BaseModel):
     critic_feedback: str = ""
     needs_more_research: bool = False
     loop_count: int = 0
+    final_draft: str = ""
+    presentation_plan: str = ""
+    pitch_script: str = ""
+    video_script: str = ""
+    video_result: str = ""
+    searcher: str = ""
+
+def perform_web_search(query: str) -> str:
+    """
+    Web検索を行い、関連する情報を取得して要約します。
+    
+    Args:
+        query: 検索クエリ
+    """
+    try:
+        client = Client()
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=f"以下のクエリについてWeb検索を行い、結果を要約して詳細に教えてください: {query}",
+            config=types.GenerateContentConfig(
+                tools=[{"google_search": {}}],
+                temperature=0.0,
+            )
+        )
+        return response.text
+    except Exception as e:
+        return f"検索エラー: {str(e)}"
+
+web_search_tool = FunctionTool(perform_web_search)
 
 class PlannerOutput(BaseModel):
     draft: str
@@ -24,15 +56,22 @@ planner_agent = Agent(
 class ResearchOutput(BaseModel):
     research: str
 
-researcher_agent = Agent(
-    name="researcher",
-    instruction="""あなたは優秀なリサーチャーです。ステートに含まれる「draft」（企画書ドラフト）について、市場調査や競合、必要な技術について深堀り調査を行い、レポートを作成してください。
-もしステートに「critic_feedback」がある場合は、それは批評家からの「再調査の要求や指摘」です。以前の調査内容（research）に加えて、その指摘事項を重点的に深掘りし、調査結果を更新してください。""",
-    output_schema=ResearchOutput,
+searcher_agent = Agent(
+    name="searcher",
+    instruction="""あなたは優秀なリサーチャーです。ステートに含まれる「draft」（企画書ドラフト）について、市場調査や競合、必要な技術について深堀り調査を行ってください。
+もしステートに「critic_feedback」がある場合は、それは批評家からの「再調査の要求や指摘」です。以前の調査内容（research）に加えて、その指摘事項を重点的に深掘りし、最新の情報を取得してください。
+必ずWeb検索ツール(perform_web_search)を利用して最新情報を取得してください。
+【重要】検索ツールの呼び出しは絶対に最大5回までとしてください。過剰な検索ループを避け、5回以内の検索で得られた情報をもとに回答を生成して処理を終了してください。""",
+    tools=[web_search_tool],
     model="gemini-2.5-flash",
 )
 
-import re
+researcher_agent = Agent(
+    name="researcher",
+    instruction="""あなたはリサーチ内容をまとめるエージェントです。ステートに含まれる「searcher」の出力やこれまでの情報を整理し、最終的な調査レポートとしてまとめてください。""",
+    output_schema=ResearchOutput,
+    model="gemini-2.5-flash",
+)
 
 class CriticOutput(BaseModel):
     critic_feedback: str
@@ -48,7 +87,6 @@ class CriticOutput(BaseModel):
                 if match:
                     val_str = match.group(1).lower()
                     data["needs_more_research"] = (val_str == "true")
-                    # Clean up the trailing garbage by splitting at the match
                     data["critic_feedback"] = feedback[:match.start()].strip().rstrip(',').rstrip('{').rstrip('}')
         return data
 
@@ -69,5 +107,32 @@ final_planner_agent = Agent(
     instruction="""あなたは優秀な企画プロデューサーです。これまでのアイデア、リサーチ結果、および批評家のフィードバックなど、ステートにある全ての情報を統合し、最終的な企画書を完成させてください。
 目的・ターゲット・体験価値・MVP・実装順序などを綺麗に整理し、Markdown形式で出力してください。""",
     output_schema=FinalPlannerOutput,
+    model="gemini-2.5-flash",
+)
+
+class ProducerAgentOutput(BaseModel):
+    presentation_plan: str
+    pitch_script: str
+
+producer_agent = Agent(
+    name="producer_agent",
+    instruction="""あなたはプレゼン資料やピッチ原稿を作成するProducer Agentです。
+ステートの「final_draft」（承認済み企画書）をもとに、発表用の構成案(presentation_plan)と、30秒程度のピッチ原稿(pitch_script)を作成してください。""",
+    output_schema=ProducerAgentOutput,
+    model="gemini-2.5-flash",
+)
+
+from backend.tools.remotion_tool import remotion_tool
+
+class VideoAgentOutput(BaseModel):
+    video_script: str
+    video_result: str
+
+video_agent = Agent(
+    name="video_agent",
+    instruction="""あなたはVideo Agentです。Producer Agentが作成した「pitch_script」をもとに、ショート動画の台本(video_script)を作成し、さらにRemotion動画生成ツールを呼び出して実際に動画を出力してください。
+動画のタイトルやテーマは、ステートの「title」を使用してください。ツール呼び出しの結果をvideo_resultに格納してください。""",
+    tools=[remotion_tool],
+    output_schema=VideoAgentOutput,
     model="gemini-2.5-flash",
 )

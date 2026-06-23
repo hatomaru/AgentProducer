@@ -57,7 +57,7 @@ async def run_agent(agent, prompt: str) -> dict:
     return {}
 
 from google.adk.runners import Runner
-from adk_agents.producer.agent import root_agent
+from adk_agents.producer.agent import root_agent, phase2_agent
 
 class StartRequest(BaseModel):
     title: str = ""
@@ -74,7 +74,6 @@ async def start_workflow(req: StartRequest):
     async for event in runner.run_async(input_data):
         if event.output is not None:
             # The final_planner_agent outputs the final draft.
-            # We can capture it if the node path is final_planner.
             if event.node_info and event.node_info.node_path == "final_planner":
                 if hasattr(event.output, "final_draft"):
                     final_draft = event.output.final_draft
@@ -91,9 +90,11 @@ async def start_workflow(req: StartRequest):
         final_draft = final_draft.replace("\\n", "\n")
 
     sessions[req.session_id] = {
+        "title": req.title,
         "user_idea": req.user_idea,
         "draft": final_draft,
-        "status": "pending_review"
+        "status": "pending_review",
+        "video_result": ""
     }
 
     return {"message": final_draft}
@@ -112,8 +113,24 @@ async def review_gate(req: ActionRequest):
     state = sessions[req.session_id]
     
     if req.action == "approve":
+        state["status"] = "processing_video"
+        
+        # Run Phase 2 Workflow
+        phase2_input = {"title": state.get("title", "動画企画"), "final_draft": state["draft"]}
+        phase2_runner = Runner(agent=phase2_agent)
+        
+        video_result = ""
+        async for event in phase2_runner.run_async(phase2_input):
+            if event.output is not None:
+                if event.node_info and event.node_info.node_path == "video_agent":
+                    if hasattr(event.output, "video_result"):
+                        video_result = event.output.video_result
+                    elif isinstance(event.output, dict) and "video_result" in event.output:
+                        video_result = event.output["video_result"]
+        
+        state["video_result"] = video_result
         state["status"] = "approved"
-        return {"message": "Draft approved.", "state": state}
+        return {"message": "Draft approved and video generated.", "state": state}
         
     elif req.action == "revise":
         revise_prompt = f"Idea: {state['user_idea']}\nPrevious Draft: {state['draft']}\nUser Revision Note: {req.revision_note}"
