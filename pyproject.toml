@@ -1,0 +1,15 @@
+[project]
+name = "marketingproduceragent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-adk>=2.3.0",
+    "google-genai>=2.9.0",
+    "langgraph>=1.2.6",
+    "pydantic>=2.13.4",
+    "pytest>=9.1.1",
+    "python-dotenv>=1.2.2",
+    "truststore>=0.10.4",
+]
