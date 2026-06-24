@@ -9,7 +9,6 @@ truststore.inject_into_ssl()
 load_dotenv()
 
 from fastapi.middleware.cors import CORSMiddleware
-from backend.agents import planner_agent, researcher_agent, critic_agent
 from google.adk.runners import InMemoryRunner
 
 app = FastAPI(title="Agent Producer API")
@@ -56,8 +55,10 @@ async def run_agent(agent, prompt: str) -> dict:
                         pass
     return {}
 
-from google.adk.runners import Runner
-from adk_agents.producer.agent import root_agent, phase2_agent
+from adk_agents.producer.agent import root_agent
+from google.adk.runners import InMemoryRunner
+
+workflow_runners = {}
 
 class StartRequest(BaseModel):
     title: str = ""
@@ -67,24 +68,30 @@ class StartRequest(BaseModel):
 @app.post("/start")
 async def start_workflow(req: StartRequest):
     input_data = {"title": req.title, "idea": req.user_idea}
-    runner = Runner(agent=root_agent)
+    runner = InMemoryRunner(agent=root_agent)
+    await runner.session_service.create_session(
+        app_name=runner.app_name, user_id="default_user", session_id=req.session_id
+    )
+    workflow_runners[req.session_id] = runner
     
     final_draft = ""
     # Run the workflow
-    async for event in runner.run_async(input_data):
-        if event.output is not None:
+    async for event in runner.run_async(session_id=req.session_id, user_id="default_user", state_delta=input_data):
+        print(f"[DEBUG /start] Got event from node: {getattr(event.node_info, 'node_path', 'unknown') if hasattr(event, 'node_info') else 'unknown'}")
+        if hasattr(event, 'output') and event.output is not None:
             # The final_planner_agent outputs the final draft.
-            if event.node_info and event.node_info.node_path == "final_planner":
+            if hasattr(event, 'node_info') and event.node_info and getattr(event.node_info, 'node_path', '') == "final_planner":
                 if hasattr(event.output, "final_draft"):
                     final_draft = event.output.final_draft
                 elif isinstance(event.output, dict) and "final_draft" in event.output:
                     final_draft = event.output["final_draft"]
 
-    # fallback if not caught from event
-    if not final_draft:
-        session = await runner.memory_service.get_session(runner.resumability_config.session_id)
-        if session and "draft" in session.state:
-            final_draft = session.state["draft"]
+        # fallback if not caught from event
+        if not final_draft and hasattr(event, 'state') and event.state:
+            if isinstance(event.state, dict) and "draft" in event.state:
+                final_draft = event.state["draft"]
+            elif hasattr(event.state, 'draft'):
+                final_draft = event.state.draft
 
     if isinstance(final_draft, str):
         final_draft = final_draft.replace("\\n", "\n")
@@ -105,24 +112,36 @@ async def get_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     return sessions[session_id]
 
+from google.genai import types
+
 @app.post("/review")
 async def review_gate(req: ActionRequest):
     if req.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
         
     state = sessions[req.session_id]
+    runner = workflow_runners.get(req.session_id)
+    if not runner:
+        raise HTTPException(status_code=500, detail="Workflow runner not found for this session")
     
     if req.action == "approve":
         state["status"] = "processing_video"
         
-        # Run Phase 2 Workflow
-        phase2_input = {"title": state.get("title", "動画企画"), "final_draft": state["draft"]}
-        phase2_runner = Runner(agent=phase2_agent)
-        
         video_result = ""
-        async for event in phase2_runner.run_async(phase2_input):
-            if event.output is not None:
-                if event.node_info and event.node_info.node_path == "video_agent":
+        msg = types.Content(parts=[types.Part.from_text(text="Approve")], role="user")
+        print(f"[DEBUG /review] Resuming runner with message: Approve")
+        
+        # 1. 再開用のメッセージを渡して中断を解除する（ADKの仕様上、ここで一度ジェネレータが完了することがある）
+        state_delta = {"final_draft": state.get("draft", "")}
+        async for event in runner.run_async(session_id=req.session_id, user_id="default_user", new_message=msg, state_delta=state_delta):
+            print(f"[DEBUG /review init] Got event from node: {getattr(event.node_info, 'node_path', 'unknown') if hasattr(event, 'node_info') else 'unknown'}")
+            
+        # 2. 残りのワークフロー（producer_agent -> video_agent）を最後まで回す
+        print(f"[DEBUG /review] Continuing runner to finish workflow")
+        async for event in runner.run_async(session_id=req.session_id, user_id="default_user", state_delta=state_delta):
+            print(f"[DEBUG /review continue] Got event from node: {getattr(event.node_info, 'node_path', 'unknown') if hasattr(event, 'node_info') else 'unknown'}")
+            if hasattr(event, 'output') and event.output is not None:
+                if hasattr(event, 'node_info') and event.node_info and getattr(event.node_info, 'node_path', '') == "video_agent":
                     if hasattr(event.output, "video_result"):
                         video_result = event.output.video_result
                     elif isinstance(event.output, dict) and "video_result" in event.output:
@@ -133,9 +152,32 @@ async def review_gate(req: ActionRequest):
         return {"message": "Draft approved and video generated.", "state": state}
         
     elif req.action == "revise":
-        revise_prompt = f"Idea: {state['user_idea']}\nPrevious Draft: {state['draft']}\nUser Revision Note: {req.revision_note}"
-        planner_out = await run_agent(planner_agent, revise_prompt)
-        state["draft"] = planner_out.get("draft", state["draft"])
+        msg = types.Content(parts=[types.Part.from_text(text=f"Reject: {req.revision_note}")], role="user")
+        
+        final_draft = ""
+        state_delta = {"final_draft": state.get("draft", "")}
+        # 1. 中断解除
+        async for event in runner.run_async(session_id=req.session_id, user_id="default_user", new_message=msg, state_delta=state_delta):
+            pass
+            
+        # 2. 継続実行
+        async for event in runner.run_async(session_id=req.session_id, user_id="default_user"):
+            if hasattr(event, 'output') and event.output is not None:
+                if hasattr(event, 'node_info') and event.node_info and getattr(event.node_info, 'node_path', '') == "final_planner":
+                    if hasattr(event.output, "final_draft"):
+                        final_draft = event.output.final_draft
+                    elif isinstance(event.output, dict) and "final_draft" in event.output:
+                        final_draft = event.output["final_draft"]
+        
+            if not final_draft and hasattr(event, 'state') and event.state:
+                if isinstance(event.state, dict) and "draft" in event.state:
+                    final_draft = event.state["draft"]
+                elif hasattr(event.state, 'draft'):
+                    final_draft = event.state.draft
+                    
+        if final_draft:
+            state["draft"] = final_draft
+            
         state["status"] = "pending_review"
         return {"message": "Draft revised.", "state": state}
         

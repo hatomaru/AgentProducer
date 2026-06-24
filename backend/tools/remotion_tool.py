@@ -3,7 +3,7 @@ import subprocess
 import time
 from google.adk.tools import FunctionTool
 
-def generate_remotion_video(title: str, composition_id: str = "HelloWorld") -> str:
+def generate_remotion_video(title: str, composition_id: str = "MyComp") -> str:
     """
     Remotionを用いて指定されたテーマに基づき背景動画やピッチ動画を生成します。
     
