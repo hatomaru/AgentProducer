@@ -16,3 +16,9 @@ Movie/
 
 # ADK
 .adk/
+
+# Logs and outputs
+*.log
+test_*.txt
+temp_*.txt
+output_artifact.json
