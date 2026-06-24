@@ -41,7 +41,7 @@ uv sync
 ADK CLI を使用して開発サーバーと PlayGround (UI) を起動します。
 
 ```bash
-uv run adk run
+uv run adk web
 ```
 
 起動後、ターミナルに表示されるローカルホストのURL（PlayGroundのUI）にブラウザでアクセスしてください。
