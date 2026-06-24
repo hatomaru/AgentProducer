@@ -22,3 +22,10 @@ Movie/
 test_*.txt
 temp_*.txt
 output_artifact.json
+
+# Temporary test outputs
+input.txt
+*draft.md
+pitch_script.md
+artifacts/
+tests/eval/datasets/
