@@ -2,6 +2,10 @@
 
 ![Agent Producer Cover](assets/cover.png)
 
+> [!NOTE]
+> **Vibe Coding (バイブコーディング) プロジェクト**
+> 本リポジトリは、AI（LLM）との対話ベースの開発アプローチである「バイブコーディング」によって構築されたプロジェクトです。個人開発の一環として公開しており、Kaggleの「AI Agents: Intensive Vibe Coding Capstone Project」への提出成果物です。
+
 ## 概要 (Overview)
 **Agent Producer** は、Google Agent Development Kit (ADK) 2.0 と Gemini を活用し、アイデアから企画書、調査、改善提案、発表資料の作成までを支援するマルチエージェントシステムです。
 
