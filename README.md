@@ -20,9 +20,11 @@ Agent Producerは、**「クリエイターの意図を中心に据えつつ、�
 - **Research Agent**: 類似作品や市場傾向を調査し、企画の差別化ポイントを補強します。
 - **Critic Agent**: 企画の弱点や制作上のリスクを洗い出し、建設的な改善案を提示します。
 - **Review Gate (Human Approval)**: 企画ドラフトが作成された段階で一時停止し、ユーザーの承認（Approve/Revise/Reject）を受け付けます。
-- **Producer Agent**: 承認された企画を元に、魅力的なキャッチコピーや30秒ピッチ原稿、発表構成を生成します。
+- **Producer Agent**: 承認された企画を元に、魅力的なキャッチコピーや30秒ピッチ原稿を生成します。
 
-## ADK2.0 PlayGroundでの実行方法 (How to Run)
+## ADK 2.0 PlayGround での実行方法 (How to Run)
+
+本プロジェクトは Google Agent Development Kit (ADK) 2.0 を利用して構築されています。以下の手順で ADK 2.0 PlayGround を立ち上げ、エージェントのワークフローをテストすることができます。
 
 ### 前提条件
 - Python 3.13 以上
@@ -35,13 +37,22 @@ Agent Producerは、**「クリエイターの意図を中心に据えつつ、�
 uv sync
 ```
 
-### 実行
-ADK2.0 の `InMemoryRunner` を用いたワークフロー（自動生成〜人間による承認〜ピッチ作成）をテストできます。
+### ADK 2.0 PlayGround の起動
+ADK CLI を使用して開発サーバーと PlayGround (UI) を起動します。
+
+```bash
+uv run adk run
+```
+
+起動後、ターミナルに表示されるローカルホストのURL（PlayGroundのUI）にブラウザでアクセスしてください。
+Web UI上からエージェントと対話し、ワークフロー（アイデア入力 → ドラフト生成 → 人間による承認 → ピッチ生成）を視覚的にテストすることができます。
+
+### （参考）CLIベースのテスト
+UIを使用せず、プログラム（InMemoryRunner）から直接ワークフローの動作を確認したい場合は、以下のスクリプトを実行してください。
 
 ```bash
 uv run python run_workflow.py
 ```
-
 実行するとターミナル上でエージェントによる企画立案が進み、途中で `=== Review (Approve) ===` として承認待ち状態になります。コード内で指定された承認プロセスを通過すると、最終的なピッチスクリプトが生成されます。
 
 ## 今後の展望 (Roadmap)
