@@ -223,7 +223,7 @@ def _get_language(ctx: Any) -> str:
     try:
         force_jp = _safe_state_get(ctx.state, "force_japanese", True)
     except Exception:
-        pass
+        force_jp = True
     if force_jp:
         return "ja"
     try:
