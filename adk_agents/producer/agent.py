@@ -218,17 +218,16 @@ def _get_original_idea(ctx: Any) -> str:
 
 def _get_language(ctx: Any) -> str:
     lang = "en"
-    
+    force_jp = True
     # force_japaneseフラグがTrueの場合は常に "ja" を返す
+    try:
+        force_jp = _safe_state_get(ctx.state, "force_japanese", True)
+    except Exception:
+        pass
     if force_jp:
         return "ja"
     try:
-        if isinstance(ctx.state, dict):
-            lang = ctx.state.get("language", "en")
-            force_jp = ctx.state.get("force_japanese", True)
-        else:
-            lang = getattr(ctx.state, "language", "en")
-            force_jp = getattr(ctx.state, "force_japanese", True)
+        lang = _safe_state_get(ctx.state, "language", "en")
     except Exception:
         pass
         
