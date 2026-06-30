@@ -10,6 +10,12 @@ load_dotenv()
 
 from fastapi.middleware.cors import CORSMiddleware
 from google.adk.runners import InMemoryRunner
+import re
+
+def detect_language(text: str) -> str:
+    if re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text):
+        return "ja"
+    return "en"
 
 app = FastAPI(title="Agent Producer API")
 
@@ -64,10 +70,12 @@ class StartRequest(BaseModel):
     title: str = ""
     user_idea: str
     session_id: str
+    force_japanese: bool = False
 
 @app.post("/start")
 async def start_workflow(req: StartRequest):
-    input_data = {"title": req.title, "idea": req.user_idea}
+    lang = detect_language(req.title + " " + req.user_idea)
+    input_data = {"title": req.title, "idea": req.user_idea, "language": lang, "force_japanese": req.force_japanese}
     runner = InMemoryRunner(agent=root_agent)
     await runner.session_service.create_session(
         app_name=runner.app_name, user_id="default_user", session_id=req.session_id

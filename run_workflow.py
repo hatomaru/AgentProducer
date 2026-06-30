@@ -17,10 +17,21 @@ async def main():
     )
     
     print("=== Start Workflow ===")
+    
+    import re
+    def detect_language(text: str) -> str:
+        if re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text):
+            return "ja"
+        return "en"
+        
+    title_text = "AI英会話アプリ"
+    idea_text = "ユーザーのレベルに合わせて英会話を教えてくれるAIアプリ。"
+    lang = detect_language(title_text + " " + idea_text)
+
     async for event in runner.run_async(
         session_id=session_id,
         user_id="default_user",
-        state_delta={"title": "AI英会話アプリ", "idea": "ユーザーのレベルに合わせて英会話を教えてくれるAIアプリ。"}
+        state_delta={"title": title_text, "idea": idea_text, "language": lang}
     ):
         if getattr(event, 'type', '') == 'request_input' or type(event).__name__ == 'RequestInput':
             break

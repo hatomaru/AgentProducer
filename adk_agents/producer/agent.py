@@ -35,7 +35,7 @@ class ProducerInput(BaseModel):
     title: Optional[str] = Field(default=None, description="Project title")
     idea: Optional[str] = Field(default=None, description="Project idea details")
     language: Optional[str] = Field(default="en", description="Language for output (e.g. 'ja' or 'en')")
-    force_japanese: bool = Field(default=True, description="Force output to be in Japanese regardless of input language")
+    force_japanese: bool = Field(default=False, description="Force output to be in Japanese regardless of input language")
     review_output: Optional[str] = Field(default=None, description="Feedback text from human")
 
     @model_validator(mode='before')
@@ -218,12 +218,12 @@ def _get_original_idea(ctx: Any) -> str:
 
 def _get_language(ctx: Any) -> str:
     lang = "en"
-    force_jp = True
+    force_jp = False
     # force_japaneseフラグがTrueの場合は常に "ja" を返す
     try:
-        force_jp = _safe_state_get(ctx.state, "force_japanese", True)
+        force_jp = _safe_state_get(ctx.state, "force_japanese", False)
     except Exception:
-        force_jp = True
+        force_jp = False
     if force_jp:
         return "ja"
     try:
