@@ -41,11 +41,17 @@ Agent Producerは、**「クリエイターの意図を中心に据えつつ、�
 uv sync
 ```
 
+**環境変数の設定:**
+プロジェクトルートに `.env` ファイルを作成し、Gemini APIキーなど必要な環境変数を設定してください。
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
 ### ADK 2.0 PlayGround の起動
 ADK CLI を使用して開発サーバーと PlayGround (UI) を起動します。
 
 ```bash
-uv run adk web
+uv run adk web adk_agents/producer
 ```
 
 起動後、ターミナルに表示されるローカルホストのURL（PlayGroundのUI）にブラウザでアクセスしてください。

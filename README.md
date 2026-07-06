@@ -41,11 +41,17 @@ Clone the repository and install the dependencies using `uv`.
 uv sync
 ```
 
+**Configure Environment Variables:**
+Create a `.env` file in the root directory to set necessary environment variables such as your Google Gemini API key.
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
 ### Launching the ADK 2.0 PlayGround
 Start the development server and PlayGround (UI) using the ADK CLI.
 
 ```bash
-uv run adk web
+uv run adk web adk_agents/producer
 ```
 
 After launching, access the localhost URL (PlayGround UI) displayed in the terminal via your browser.

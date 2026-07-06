@@ -290,10 +290,12 @@ Break down abstract ideas into objectives, target audience, experiential value, 
 
 def get_critic_instruction(ctx: Any) -> str:
     idea = _get_original_idea(ctx)
+    lang = _get_language(ctx)
     draft = _get_state_value(ctx, "draft")
     research = _get_state_value(ctx, "research")
     
-    base_instruction = f"""あなたは鋭い視点を持つ批評家（Critic）です。ステートに含まれる 'draft' と 'research' を読み、提案の弱点、リスク、および改善案を指摘して、企画をさらにブラッシュアップしてください。
+    if lang == "ja":
+        base_instruction = f"""あなたは鋭い視点を持つ批評家（Critic）です。ステートに含まれる 'draft' と 'research' を読み、提案の弱点、リスク、および改善案を指摘して、企画をさらにブラッシュアップしてください。
 
 [CRITICAL INSTRUCTION]
 このプロジェクトの中核となるのは以下のオリジナルアイデアです。
@@ -305,7 +307,20 @@ def get_critic_instruction(ctx: Any) -> str:
 構造化されたJSONスキーマに従って出力してください。テキストの末尾に手動でJSON文字列を追加しないでください。
 内容が不十分で追加のリサーチが必要な場合は、JSONパラメータ `needs_more_research` を true に設定し、フィードバックテキスト内にリサーチャー向けの追加調査ポイントを含めてください。十分な場合は false に設定してください。
 必ずブール値として出力してください。文字列の 'true' や 'false' は使用せず、JSONのブール値（true / false）として指定してください。
-言語設定に関わらず、フィードバック内容は必ず日本語で出力してください。"""
+必ず日本語で出力してください。"""
+    else:
+        base_instruction = f"""You are a critic with a sharp perspective. Read the 'draft' and 'research' included in the state, point out the weaknesses, risks, and areas for improvement in the proposal, and further brush up the project.
+
+[CRITICAL INSTRUCTION]
+The core of this project is the following original idea.
+--- ORIGINAL IDEA ---
+{idea}
+---------------------
+You must verify that the 'draft' strictly follows this core concept. If the draft deviates from this concept, you must strongly point it out and instruct the planner to return to the original concept.
+
+Output according to the structured JSON schema. Do not manually append a JSON string to the end of the text.
+If the content is insufficient and additional research is needed, set the JSON parameter `needs_more_research` to true, and include additional research points for the researcher in the feedback text. If it is sufficient, set it to false.
+Must be output as a boolean value. Do not use string 'true' or 'false', specify as JSON boolean (true / false)."""
 
     return f"{base_instruction}\n\n=== DRAFT ===\n{draft}\n\n=== RESEARCH ===\n{research}"
 
